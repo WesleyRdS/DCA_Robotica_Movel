@@ -16,7 +16,7 @@ img[img <= threshold] = 0
 ax.imshow(img, cmap='Greys', origin='upper')
 
 #dimensão do mapa informada em CM
-map_dims = np.array([27,27])
+map_dims = np.array([18,27])
 sy, sx = img.shape[:2] / map_dims
 
 #tamanho da celula do grid em CM
@@ -73,7 +73,7 @@ ax.set_yticks(np.arange(0, map_dims[0]+1, cell_size))
 
 #os vertices serão plotados no centro da celula
 pos = {node:(node[1]*cell_size+cell_size/2, map_dims[0] - node[0]* cell_size-cell_size/2) for node in G.nodes()}
-nx.draw(G, pos, font_size=3, with_labels=True, node_size=50, node_color='g', ax=ax)
+nx.draw(G, pos, font_size=6, with_labels=True, node_size=50, node_color='g', ax=ax)
 
 from mmap import MAP_DENYWRITE
 #Atenção ao sistema de coordenadas -- relação indice do grid e posição no mapa
@@ -84,7 +84,7 @@ end_node = (1,10)
 fig = plt.figure(figsize=(8,8), dpi=100)
 ax = fig.add_subplot(111, aspect='equal')
 
-obj = ax.imshow(grid, cmap='Greys', extent=(0, map_dims[1], 0, map_dims[1]))
+obj = ax.imshow(grid, cmap='Greys', extent=(0, map_dims[1], 0, map_dims[0]))
 
 path = nx.shortest_path(G, source=start_node, target=end_node)
 nx.draw_networkx_nodes(G, pos, nodelist=path, node_color='b', node_size=100)
