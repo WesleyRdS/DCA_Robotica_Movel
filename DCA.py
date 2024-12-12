@@ -2,6 +2,10 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import nxt
+import nxt.locator 
+import nxt.brick
+import time 
 
 fig = plt.figure(figsize=(8,8), dpi=100)
 ax = fig.add_subplot(111, aspect='equal')
@@ -89,3 +93,8 @@ obj = ax.imshow(grid, cmap='Greys', extent=(0, map_dims[1], 0, map_dims[0]))
 path = nx.shortest_path(G, source=start_node, target=end_node)
 nx.draw_networkx_nodes(G, pos, nodelist=path, node_color='b', node_size=100)
 plt.show()
+
+bob = nxt.locator.find(host="00:16:53:09:72:DE")
+bob.message_write(1, str(path).encode("utf-8"))
+
+#read_msm = bob.message_read(5, 2, False)
