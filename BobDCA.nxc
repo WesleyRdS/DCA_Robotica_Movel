@@ -1,0 +1,153 @@
+#define LEFT_WELL OUT_B
+#define RIGHT_WHELL OUT_C
+#define BOTH_WHELL OUT_BC
+#define WHELLS_RADIUS 2.25
+#define ROBOT_DIAMETER 16.7
+#define PI_FACTOR 3.14159265358979323846
+#define BT_CONN 1
+#define INBOX 1
+#define OUTBOX 5
+
+//Prototypes
+void move_robot(int velocity, float distance, float whells_r);
+void prevt(string path_data, string inital_position, int dteta);
+void turn_robot(int velocity, int diferential_factor, float degress, float whells_r);
+unsigned int findCloseParenteses(string str, unsigned int startIdx);
+unsigned int findOpenParenteses(string str, unsigned int startIdx);
+
+
+//Vars
+unsigned int idx = 0;  
+unsigned int startIdx = 0;  
+unsigned int endIdx = 0;  
+unsigned int len = 0; 
+string tupla;
+string msg_recv = "";
+
+
+task receive_path()
+{
+    while (msg_recv == "")
+    {
+        ReceiveRemoteString(INBOX, true, msg_recv);
+        TextOut(10,LCD_LINE1,"Bob_DCA:");
+        TextOut(0,LCD_LINE2,"Recebendo(Lista de adj):");
+        TextOut(0,LCD_LINE3,msg_recv);
+        ClearScreen();
+    }
+    
+}
+
+task main()
+{
+    SetSensorUltrasonic(IN_4);
+    Precedes(receive_path);
+    prevt("(1,1)",msg_recv,0); 
+
+}
+
+void move_robot(int velocity, float distance, float whells_r)
+{
+    float rotations_targent = distance / (2*PI_FACTOR*whells_r);
+    int rightO_rotations = MotorRotationCount(RIGHT_WHELL);
+    int leftO_rotations = MotorRotationCount(LEFT_WELL);
+    int right_rotations = 0;
+    int left_rotations = 0;
+    int total_rotations = (rotations_targent*1000)/3.6;
+
+    OnFwdSync(BOTH_WHELL, velocity, 0);
+
+    while (right_rotations < total_rotations && left_rotations < total_rotations)
+    {
+        right_rotations = abs(MotorRotationCount(RIGHT_WHELL) - rightO_rotations);
+        left_rotations = abs(MotorRotationCount(LEFT_WELL) - leftO_rotations);
+    }  
+}
+//diferenctial_factor: 100 para esquerda e -100 para a direita
+void turn_robot(int velocity, int diferential_factor, float degress, float whells_r)
+{
+  
+    int rightO_rotations = MotorRotationCount(RIGHT_WHELL);
+    int leftO_rotations = MotorRotationCount(LEFT_WELL);
+    int right_rotations = 0;
+    int left_rotations = 0;
+    float teta = 0;
+    float deg_to_rad = degress * (180/PI_FACTOR);
+
+    OnFwdSync(BOTH_WHELL, velocity, diferential_factor);
+    
+    while (teta < deg_to_rad)
+    {
+        right_rotations = abs(MotorRotationCount(RIGHT_WHELL) - rightO_rotations);
+        left_rotations = abs(MotorRotationCount(LEFT_WELL) - leftO_rotations);
+        teta += (right_rotations - left_rotations)/(2*whells_r);        
+    }  
+}
+
+unsigned int findOpenParenteses(string str, unsigned int startIdx)
+{
+    for(unsigned int i = startIdx; i < StrLen(str); i++)
+    {
+        if(str[i] == '(')
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+unsigned int findCloseParenteses(string str, unsigned int startIdx)
+{
+    for(unsigned int i = startIdx; i < StrLen(str); i++)
+    {
+        if(str[i] == ')')
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+
+void prevt(string path_data, string inital_position, int dteta){
+    string current_position = inital_position;
+    if(dteta != 0)
+    {
+        int phi_correction = 0 - dteta;
+        turn_robot(25,100,phi_correction,WHELLS_RADIUS);
+    }
+    while (true)
+    {
+        startIdx = findOpenParenteses(path_data, idx);
+        if(startIdx == -1) break;
+
+        endIdx = findCloseParenteses(path_data,startIdx);
+        if(endIdx == -1) break;
+
+        len = endIdx - startIdx + 1;
+        
+        tupla = SubStr(path_data, startIdx, len);
+        string YOaux = SubStr(current_position, 1,1);
+        string XOaux = SubStr(current_position, 3,1);
+        string Yaux = SubStr(tupla, 1,1);
+        string Xaux = SubStr(tupla, 3,1);
+        if((YOaux != Yaux) && StrToNum(YOaux) <  StrToNum(Yaux)){
+            turn_robot(25,100,90,WHELLS_RADIUS);
+        }
+        else if ((YOaux != Yaux) && StrToNum(YOaux) >  StrToNum(Yaux))
+        {
+            turn_robot(25,-100,90,WHELLS_RADIUS);
+        }
+        if((Xaux != XOaux) && StrToNum(XOaux) <  StrToNum(Xaux)){
+            move_robot(25,40,WHELLS_RADIUS);
+        }else if((Xaux != XOaux) && StrToNum(XOaux) > StrToNum(Xaux)){
+            turn_robot(25,100,90,WHELLS_RADIUS);
+            move_robot(25,40,WHELLS_RADIUS);
+        }
+        current_position = tupla;
+    }
+    
+    
+}
+
+
