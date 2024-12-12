@@ -1,6 +1,6 @@
-#define LEFT_WELL OUT_B
+#define LEFT_WHELL OUT_B
 #define RIGHT_WHELL OUT_C
-#define BOTH_WHELL OUT_BC
+#define BOTH_WHEELS OUT_BC
 #define WHELLS_RADIUS 2.25
 #define ROBOT_DIAMETER 16.7
 #define PI_FACTOR 3.14159265358979323846
@@ -11,7 +11,7 @@
 //Prototypes
 void move_robot(int velocity, float distance, float whells_r);
 void prevt(string path_data, string inital_position, int dteta);
-void turn_robot(int velocity, int diferential_factor, float degress, float whells_r);
+void turn_robot(int velocity, int differential_factor, float degrees, float wheel_radius);
 unsigned int findCloseParenteses(string str, unsigned int startIdx);
 unsigned int findOpenParenteses(string str, unsigned int startIdx);
 
@@ -50,38 +50,37 @@ void move_robot(int velocity, float distance, float whells_r)
 {
     float rotations_targent = distance / (2*PI_FACTOR*whells_r);
     int rightO_rotations = MotorRotationCount(RIGHT_WHELL);
-    int leftO_rotations = MotorRotationCount(LEFT_WELL);
+    int leftO_rotations = MotorRotationCount(LEFT_WHELL);
     int right_rotations = 0;
     int left_rotations = 0;
     int total_rotations = (rotations_targent*1000)/3.6;
 
-    OnFwdSync(BOTH_WHELL, velocity, 0);
+    OnFwdSync(BOTH_WHEELS, velocity, 0);
 
     while (right_rotations < total_rotations && left_rotations < total_rotations)
     {
         right_rotations = abs(MotorRotationCount(RIGHT_WHELL) - rightO_rotations);
-        left_rotations = abs(MotorRotationCount(LEFT_WELL) - leftO_rotations);
+        left_rotations = abs(MotorRotationCount(LEFT_WHELL) - leftO_rotations);
     }  
 }
 //diferenctial_factor: 100 para esquerda e -100 para a direita
-void turn_robot(int velocity, int diferential_factor, float degress, float whells_r)
-{
-  
-    int rightO_rotations = MotorRotationCount(RIGHT_WHELL);
-    int leftO_rotations = MotorRotationCount(LEFT_WELL);
-    int right_rotations = 0;
-    int left_rotations = 0;
-    float teta = 0;
-    float deg_to_rad = degress * (180/PI_FACTOR);
+void turn_robot(int velocity, int differential_factor, float degrees, float wheel_radius) {
+    int right_initial_rotations = MotorRotationCount(RIGHT_WHELL);
+    int left_initial_rotations = MotorRotationCount(LEFT_WHELL);
+    float target_angle_rad = degrees * PI / 180.0;
+    float current_angle_rad = 0.0;
+    float tolerance = 0.05; 
 
-    OnFwdSync(BOTH_WHELL, velocity, diferential_factor);
-    
-    while (teta < deg_to_rad)
-    {
-        right_rotations = abs(MotorRotationCount(RIGHT_WHELL) - rightO_rotations);
-        left_rotations = abs(MotorRotationCount(LEFT_WELL) - leftO_rotations);
-        teta += (right_rotations - left_rotations)/(2*whells_r);        
-    }  
+    OnFwdSync(BOTH_WHEELS, velocity, differential_factor);
+
+    while (abs(current_angle_rad - target_angle_rad) > tolerance) {
+        int right_rotations = abs(MotorRotationCount(RIGHT_WHELL) - right_initial_rotations);
+        int left_rotations = abs(MotorRotationCount(LEFT_WHELL) - left_initial_rotations);
+        float delta_angle = (right_rotations - left_rotations) / (2 * wheel_radius);
+        current_angle_rad += delta_angle;
+    }
+
+    Off(BOTH_WHEELS);
 }
 
 unsigned int findOpenParenteses(string str, unsigned int startIdx)
