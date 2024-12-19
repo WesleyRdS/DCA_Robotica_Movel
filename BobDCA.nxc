@@ -15,6 +15,7 @@ void turn_robot(int velocity, int differential_factor, float degrees, float whee
 unsigned int findCloseParenteses(string str, unsigned int startIdx);
 unsigned int findOpenParenteses(string str, unsigned int startIdx);
 void move_and_turn(int turn_speed, int turn_angle, int move_speed);
+int findComma(string str);
 
 //Vars
 unsigned int idx = 0;  
@@ -23,17 +24,31 @@ unsigned int endIdx = 0;
 unsigned int len = 0; 
 string tupla;
 string msg_recv = "";
+string angle = "";
 mutex motor_control;
 
-task receive_path()
+void receive_path()
 {
-    while (msg_recv == "")
+    while (true)
     {
-        ReceiveRemoteString(INBOX, true, msg_recv);
-        TextOut(10,LCD_LINE1,"Bob_DCA:");
+        string tempMSG = "";
+        string aux = "";
+        ReceiveMessage(INBOX, true, tempMSG);
+        if(tempMSG != aux && tempMSG != "Init" && tempMSG != "End")
+        {
+            msg_recv += tempMSG;
+            aux = tempMSG;
+        }
+        if(tempMSG == "End"){
+            break;
+        }
         TextOut(0,LCD_LINE2,"Recebendo(Lista de adj):");
         TextOut(0,LCD_LINE3,msg_recv);
-        ClearScreen();
+        Wait(200);
+    }
+    while (angle == "")
+    {
+        ReceiveMessage(INBOX, true, angle);
     }
     
 }
@@ -41,10 +56,12 @@ task receive_path()
 task main()
 {
     SetSensorUltrasonic(IN_4);
-    //Precedes(receive_path);
+    //receive_path();
+    //TextOut(0,LCD_LINE4,aux);
     //prevt("(1,1)",msg_recv,0);
     string teste = "[(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1), (10, 1), (11, 1), (12, 1), (13, 1), (13, 2), (13, 3), (13, 4), (13, 5), (13, 6), (13, 7), (13, 8), (13, 9), (13, 10), (14, 10), (15, 10), (16, 10)]";
     prevt(teste,"(1,1)",0); 
+    
 
 }
 
@@ -57,41 +74,37 @@ void move_robot(int velocity, float distance, float whells_r)
     int left_rotations = 0;
     int total_rotations = (rotations_targent*1000)/3.6;
     Acquire(motor_control);
-    OnFwdSync(BOTH_WHEELS, velocity, 0);
+    RotateMotorEx(BOTH_WHEELS, velocity, total_rotations, 0, true, true);
 
     while (right_rotations < total_rotations && left_rotations < total_rotations)
     {
+    	
         right_rotations = abs(MotorRotationCount(RIGHT_WHELL) - rightO_rotations);
         left_rotations = abs(MotorRotationCount(LEFT_WHELL) - leftO_rotations);
     }
-    Off(OUT_BC);   
+    Off(BOTH_WHEELS);   
     Release(motor_control);
 }
 
 //diferenctial_factor: 100 para esquerda e -100 para a direita
 void turn_robot(int velocity, int differential_factor, float degrees, float wheel_radius) {
-    int rightO_rotations = MotorRotationCount(RIGHT_WHELL);
-    int leftO_rotations = MotorRotationCount(LEFT_WHELL);
+    ResetRotationCount(BOTH_WHEELS);
     int right_rotations = 0;
     int left_rotations = 0;
     float teta = 0;
-    float tolerance = -20;
+    float tolerance = 2;
   
 
     Acquire(motor_control);
-    OnFwdSync(BOTH_WHEELS, velocity, differential_factor);
-    
     while (degrees - teta > tolerance)
-    {
-        right_rotations = (MotorRotationCount(RIGHT_WHELL)-rightO_rotations)/180;
-        left_rotations = (MotorRotationCount(LEFT_WHELL)-leftO_rotations)/180;
+    { 	
+	RotateMotorEx(BOTH_WHEELS, velocity, degrees, differential_factor, true, true);
+        right_rotations = (MotorRotationCount(RIGHT_WHELL))/2*wheel_radius;
+        left_rotations = (MotorRotationCount(LEFT_WHELL))/2*wheel_radius;
         teta += abs(right_rotations - left_rotations)/(4*wheel_radius);
         TextOut(0,LCD_LINE2,NumToStr(degrees - teta));
-        leftO_rotations = left_rotations;
-        rightO_rotations = right_rotations;
-        
     }
-    Off(OUT_BC);
+    Off(BOTH_WHEELS);
     Release(motor_control);
 }
 
@@ -126,6 +139,16 @@ void move_and_turn(int turn_speed, int turn_angle, int move_speed) {
     move_robot(25, move_speed, WHELLS_RADIUS);
 }
 
+// Função para encontrar a posição da vírgula na string
+int findComma(string str) {
+    for (int i = 0; i < StrLen(str); i++) {
+        if (str[i] == ',') {
+            return i;
+        }
+    }
+    return -1; // Retorna -1 se não encontrar a vírgula
+}
+
 void prevt(string path_data, string initial_position, int dteta) {
     string current_position = initial_position;
     int current_orientation = dteta; // Orientação inicial do robô (0, 90, 180, 270 graus)
@@ -139,12 +162,22 @@ void prevt(string path_data, string initial_position, int dteta) {
 
         len = endIdx - startIdx + 1;
         tupla = SubStr(path_data, startIdx, len);
+        SendMessage(OUTBOX, tupla);
+
+
+        TextOut(0, LCD_LINE1, tupla); // Exibe a tupla na tela
+        
 
         // Extraindo coordenadas da posição atual e da próxima posição
-        int YOaux = StrToNum(SubStr(current_position, 1, 1));
-        int XOaux = StrToNum(SubStr(current_position, 3, 1));
-        int Yaux = StrToNum(SubStr(tupla, 1, 1));
-        int Xaux = StrToNum(SubStr(tupla, 3, 1));
+        // Encontrar a vírgula em current_position
+        int commaPos = findComma(current_position);  // Encontrar a vírgula
+        int YOaux = StrToNum(SubStr(current_position, 1, commaPos - 1));  // Coordenada Y
+        int XOaux = StrToNum(SubStr(current_position, commaPos + 1, StrLen(current_position) - commaPos - 1));  // Coordenada X
+
+        // Encontrar a vírgula em tupla
+        commaPos = findComma(tupla);  // Encontrar a vírgula na tupla
+        int Yaux = StrToNum(SubStr(tupla, 1, commaPos - 1));  // Coordenada Y da tupla
+        int Xaux = StrToNum(SubStr(tupla, commaPos + 1, StrLen(tupla) - commaPos - 1));  // Coordenada X da tupla
 
         // Calculando mudanças em X e Y
         int deltaX = Xaux - XOaux;
@@ -153,54 +186,56 @@ void prevt(string path_data, string initial_position, int dteta) {
         // Determinando a ação com base na orientação atual
         if (deltaX > 0) { // Movendo no eixo X positivo
             if (current_orientation == 0) {
-                move_robot(25, 40, WHELLS_RADIUS);
+                move_robot(25, 16, WHELLS_RADIUS);
             } else if (current_orientation == 90) {
-                move_and_turn(-100, 90, 40);
-                current_orientation = 0;
-            } else if (current_orientation == 180) {
-                move_and_turn(100, 180, 40);
-                current_orientation = 0;
+                move_and_turn(100, 90, 16);
+                current_orientation = 180;
+            } else if (current_orientation == 0) {
+                move_and_turn(100, 180, 16);
+                current_orientation = 180;
             } else if (current_orientation == 270) {
-                move_and_turn(100, 90, 40);
-                current_orientation = 0;
+                move_and_turn(-100, 90, 16);
+                current_orientation = 180;
             }
         } else if (deltaX < 0) { // Movendo no eixo X negativo
             if (current_orientation == 180) {
-                move_robot(25, 40, WHELLS_RADIUS);
+                move_robot(25, 16, WHELLS_RADIUS);
             } else if (current_orientation == 90) {
-                move_and_turn(100, 90, 40);
-                current_orientation = 180;
-            } else if (current_orientation == 0) {
-                move_and_turn(100, 180, 40);
-                current_orientation = 180;
+                move_and_turn(-100, 90, 16);
+                current_orientation = 0;
+            } else if (current_orientation == 180) {
+                move_and_turn(100, 180, 16);
+                current_orientation = 0;
             } else if (current_orientation == 270) {
-                move_and_turn(-100, 90, 40);
-                current_orientation = 180;
+                move_and_turn(100, 90, 16);
+                current_orientation = 0;
             }
+            
+            
         } else if (deltaY > 0) { // Movendo no eixo Y positivo
             if (current_orientation == 90) {
-                move_robot(25, 40, WHELLS_RADIUS);
+                move_robot(25, 8, WHELLS_RADIUS);
             } else if (current_orientation == 0) {
-                move_and_turn(-100, 90, 40);
+                move_and_turn(-100, 90, 8);
                 current_orientation = 90;
             } else if (current_orientation == 180) {
-                move_and_turn(100, -90, 40);
+                move_and_turn(100, -90, 8);
                 current_orientation = 90;
             } else if (current_orientation == 270) {
-                move_and_turn(100, 180, 40);
+                move_and_turn(100, 180, 8);
                 current_orientation = 90;
             }
         } else if (deltaY < 0) { // Movendo no eixo Y negativo
             if (current_orientation == 270) {
-                move_robot(25, 40, WHELLS_RADIUS);
+                move_robot(25, 8, WHELLS_RADIUS);
             } else if (current_orientation == 0) {
-                move_and_turn(100, 90, 40);
+                move_and_turn(100, 90, 8);
                 current_orientation = 270;
             } else if (current_orientation == 90) {
-                move_and_turn(100, 180, 40);
+                move_and_turn(100, 180, 8);
                 current_orientation = 270;
             } else if (current_orientation == 180) {
-                move_and_turn(-100, 90, 40);
+                move_and_turn(-100, 90, 8);
                 current_orientation = 270;
             }
         }
@@ -210,4 +245,3 @@ void prevt(string path_data, string initial_position, int dteta) {
         idx = endIdx;
     }
 }
-
