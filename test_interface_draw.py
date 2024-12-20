@@ -8,7 +8,7 @@ import json  # Para carregar o path salvo
 # Configuração inicial da malha
 map_dims = np.array([18, 27])  # Dimensão do mapa em partes (18x27)
 robot_radius = 0.5             # Tamanho do robô em células
-robot_position = (0.5, 0.5)    # Posição inicial do robô na malha (linha, coluna)
+robot_position = (1, 1)        # Posição inicial do robô na malha (linha, coluna)
 robot_path = []                # Histórico do caminho percorrido pelo robô
 
 # Carrega a imagem do mapa
@@ -21,18 +21,53 @@ if map_image is None:
 # Calcula o tamanho da célula em pixels
 sy, sx = map_image.shape[:2] / map_dims
 
-# Função para desenhar o rastro do robô no mapa
-def draw_robot_path(map_img, path, sx, sy):
-    for i in range(1, len(path)):
-        # Converte as posições do caminho para coordenadas de pixels
-        prev_pos = path[i - 1]
-        curr_pos = path[i]
+# Lê o caminho gerado no DCA.py
+try:
+    with open("path_data.json", "r") as path_file:
+        path_data = json.load(path_file)
+        path = path_data.get("path", [])
+        angle = path_data.get("angle", "")
+        print(f"Caminho carregado: {path}")
+        print(f"Ângulo carregado: {angle}")
+except FileNotFoundError:
+    print("Arquivo 'path_data.json' não encontrado. Certifique-se de que o DCA.py foi executado.")
+    path = []
+    angle = ""
+
+# Função para desenhar o rastro do robô no mapa (passado e futuro)
+def draw_robot_path(map_img, robot_path, full_path, sx, sy):
+    # Desenhar o caminho já percorrido (azul)
+    for i in range(1, len(robot_path)):
+        prev_pos = robot_path[i - 1]
+        curr_pos = robot_path[i]
+
+        # Converte strings para tuplas, se necessário
+        if isinstance(prev_pos, str):
+            prev_pos = eval(prev_pos)
+        if isinstance(curr_pos, str):
+            curr_pos = eval(curr_pos)
 
         prev_pixel = (int((prev_pos[1] + 0.5) * sx), int((prev_pos[0] + 0.5) * sy))
         curr_pixel = (int((curr_pos[1] + 0.5) * sx), int((curr_pos[0] + 0.5) * sy))
 
-        # Desenha uma linha entre as posições consecutivas
-        cv2.line(map_img, prev_pixel, curr_pixel, (255, 0, 0), 2)  # Azul para o rastro
+        cv2.line(map_img, prev_pixel, curr_pixel, (255, 0, 0), 2)  # Azul para o rastro já percorrido
+
+    # Desenhar o caminho futuro (cinza claro)
+    future_path = full_path[len(robot_path):]  # Caminho a ser percorrido
+    for i in range(1, len(future_path)):
+        prev_pos = future_path[i - 1]
+        curr_pos = future_path[i]
+
+        # Converte strings para tuplas, se necessário
+        if isinstance(prev_pos, str):
+            prev_pos = eval(prev_pos)
+        if isinstance(curr_pos, str):
+            curr_pos = eval(curr_pos)
+
+        prev_pixel = (int((prev_pos[1] + 0.5) * sx), int((prev_pos[0] + 0.5) * sy))
+        curr_pixel = (int((curr_pos[1] + 0.5) * sx), int((curr_pos[0] + 0.5) * sy))
+
+        cv2.line(map_img, prev_pixel, curr_pixel, (200, 200, 200), 1)  # Cinza claro para o futuro
 
 # Função para desenhar a posição do robô no mapa
 def draw_robot_on_map(map_img, position, radius, map_dims, sx, sy):
@@ -75,6 +110,10 @@ def receive_coordinates_via_bluetooth():
     for coord in path:
         bob.message_write(1, str(coord).encode("utf-8"))
     bob.message_write(1, "end".encode("utf-8"))
+    if angle:
+        bob.message_write(1, angle.encode("utf-8"))
+    else:
+        print("Ângulo não definido. Verifique o arquivo 'path_data.json'.")
 
     while running:
         try:
@@ -86,20 +125,10 @@ def receive_coordinates_via_bluetooth():
                 if coord_str:
                     new_position = eval(coord_str)  # Ex: (1, 1)
                     update_robot_position(new_position, map_dims)
-            time.sleep(0.25)
+            # time.sleep(0.25)
         except Exception as e:
             print(f"Erro na comunicação Bluetooth: {e}")
             break
-
-# Lê o caminho gerado no DCA.py
-try:
-    with open("path_data.json", "r") as path_file:
-        path_data = json.load(path_file)
-        path = path_data.get("path", [])
-        print(f"Caminho carregado: {path}")
-except FileNotFoundError:
-    print("Arquivo 'path_data.json' não encontrado. Certifique-se de que o DCA.py foi executado.")
-    path = []
 
 # Configuração da janela do OpenCV
 cv2.namedWindow("Mapa com Robô")
@@ -115,8 +144,8 @@ while running:
     # Cria uma cópia do mapa para desenhar
     map_with_path = map_image.copy()
 
-    # Desenha o rastro do robô no mapa
-    draw_robot_path(map_with_path, robot_path, sx, sy)
+    # Desenha o rastro do robô no mapa (passado e futuro)
+    draw_robot_path(map_with_path, robot_path, path, sx, sy)
 
     # Desenha o robô no mapa
     current_map = draw_robot_on_map(map_with_path, robot_position, robot_radius, map_dims, sx, sy)
