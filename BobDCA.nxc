@@ -24,7 +24,11 @@ unsigned int endIdx = 0;
 unsigned int len = 0; 
 string tupla;
 string msg_recv = "[";
+string msg_recv = "[";
 string angle = "";
+string pos_o = "";
+int count = 0;
+int o_orientation = 0;
 string pos_o = "";
 int count = 0;
 int o_orientation = 0;
@@ -44,10 +48,19 @@ void receive_path()
             }
         }
         if(tempMSG != aux && tempMSG != "init" && tempMSG != "end")
+        if(tempMSG == "init")
         {
+            while(pos_o == ""){
+            	ReceiveMessage(INBOX, false, pos_o);
+            }
+        }
+        if(tempMSG != aux && tempMSG != "init" && tempMSG != "end")
+        {
+            msg_recv += tempMSG+",";
             msg_recv += tempMSG+",";
             aux = tempMSG;
         }
+        if(tempMSG == "end"){
         if(tempMSG == "end"){
             break;
         }
@@ -55,10 +68,13 @@ void receive_path()
         TextOut(0,LCD_LINE3,msg_recv);
     }
     msg_recv += "]";
+    msg_recv += "]";
     while (angle == "")
     {
         ReceiveMessage(INBOX, true, angle);
     }
+    TextOut(0,LCD_LINE4,angle);
+    ClearScreen();
     TextOut(0,LCD_LINE4,angle);
     ClearScreen();
 }
@@ -101,6 +117,7 @@ void turn_robot(int velocity, int differential_factor, float degrees, float whee
     int right_rotations = 0;
     int left_rotations = 0;
     float teta = 0;
+    float tolerance = 10;
     float tolerance = 10;
 
     Acquire(motor_control);
@@ -179,6 +196,7 @@ void prevt(string path_data, string initial_position, int dteta) {
     string current_position = initial_position;
     int current_orientation = dteta; // Orientação inicial do robô (0, 90, 180, 270 graus)
     o_orientation = current_orientation;
+    o_orientation = current_orientation;
     while (true) {
         startIdx = findOpenParenteses(path_data, idx);
         if (startIdx == -1) break;
@@ -210,10 +228,17 @@ void prevt(string path_data, string initial_position, int dteta) {
         int deltaY = Yaux - YOaux;
 
         // Determinando a ação com base na orientação atual -100 esquerda 100 direita
+        // Determinando a ação com base na orientação atual -100 esquerda 100 direita
         if (deltaX > 0) { // Movendo no eixo X positivo
             if (current_orientation == 0) {
                 move_robot(25, 10, WHELLS_RADIUS);
+                move_robot(25, 10, WHELLS_RADIUS);
             } else if (current_orientation == 90) {
+                move_and_turn(100, 90, 10);
+                current_orientation = 0;
+            } else if (current_orientation == 180) {
+                move_and_turn(100, 180, 10);
+                current_orientation = 0;
                 move_and_turn(100, 90, 10);
                 current_orientation = 0;
             } else if (current_orientation == 180) {
@@ -222,14 +247,24 @@ void prevt(string path_data, string initial_position, int dteta) {
             } else if (current_orientation == 270) {
                 move_and_turn(100, 90, 10);
                 current_orientation = 0;
+                move_and_turn(100, 90, 10);
+                current_orientation = 0;
             }
         } else if (deltaX < 0) { // Movendo no eixo X negativo
             if (current_orientation == 180) {
                 move_robot(25, 10, WHELLS_RADIUS);
+                move_robot(25, 10, WHELLS_RADIUS);
             } else if (current_orientation == 90) {
                 move_and_turn(100, 90, 10);
                 current_orientation = 180;
+                move_and_turn(100, 90, 10);
+                current_orientation = 180;
             } else if (current_orientation == 270) {
+                move_and_turn(-100, 90, 10);
+                current_orientation = 180;
+            } else if (current_orientation == 0) {
+                move_and_turn(100, 1800, 10);
+                current_orientation = 180;
                 move_and_turn(-100, 90, 10);
                 current_orientation = 180;
             } else if (current_orientation == 0) {
@@ -242,25 +277,39 @@ void prevt(string path_data, string initial_position, int dteta) {
             if (current_orientation == 90) {
              	move_and_turn(-100, 180, 10);
              	current_orientation = 270;
+             	move_and_turn(-100, 180, 10);
+             	current_orientation = 270;
             } else if (current_orientation == 0) {
+                move_and_turn(-100, 90, 10);
+                current_orientation = 270;
                 move_and_turn(-100, 90, 10);
                 current_orientation = 270;
             } else if (current_orientation == 180) {
                 move_and_turn(100, 90, 10);
                 current_orientation = 270;
+                move_and_turn(100, 90, 10);
+                current_orientation = 270;
             } else if (current_orientation == 270) {
+                move_robot(25, 10, WHELLS_RADIUS);
                 move_robot(25, 10, WHELLS_RADIUS);
             }
         } else if (deltaY < 0) { // Movendo no eixo Y negativo
             if (current_orientation == 270) {
                 move_and_turn(100, 180, 10);
                 current_orientation = 90;
+                move_and_turn(100, 180, 10);
+                current_orientation = 90;
             } else if (current_orientation == 0) {
+                move_and_turn(100, 90, 10);
+                current_orientation = 90;
                 move_and_turn(100, 90, 10);
                 current_orientation = 90;
             } else if (current_orientation == 90) {
                 move_robot(25, 10, WHELLS_RADIUS);
+                move_robot(25, 10, WHELLS_RADIUS);
             } else if (current_orientation == 180) {
+                move_and_turn(-100, 90, 10);
+                current_orientation = 90;
                 move_and_turn(-100, 90, 10);
                 current_orientation = 90;
             }
